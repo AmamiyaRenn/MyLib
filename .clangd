@@ -1,0 +1,8 @@
+﻿Index:
+    Background: Build
+InlayHints:
+    Enabled: Yes
+    ParameterNames: Yes
+    DeducedTypes: Yes
+Hover:
+    ShowAKA: Yes
