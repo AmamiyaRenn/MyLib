@@ -91,14 +91,12 @@ typedef struct ZemT
     pthread_cond_t  cond;
     pthread_mutex_t lock;
 } ZemT;
-
 void Zem_init(ZemT* s, int value)
 {
     s->value = value;
     pthread_cond_init(&s->cond, NULL);
     pthread_mutex_init(&s->lock, NULL);
 }
-
 void Zem_wait(ZemT* s)
 {
     mutex_lock(&s->lock);
@@ -107,11 +105,40 @@ void Zem_wait(ZemT* s)
     s->value--; // 这句放到while前会导致逻辑出问题从而死锁
     mutex_unlock(&s->lock);
 }
-
 void Zem_post(ZemT* s)
 {
     mutex_lock(&s->lock);
     s->value++;
     cond_signal(&s->cond);
     mutex_unlock(&s->lock);
+}
+
+///\brief 读写锁
+typedef struct RWLockT
+{
+    ZemT lock; // binary lock
+    ZemT writelock;
+    int  readers;
+} RWLockT;
+void RWLock_init(RWLockT* rwlock)
+{
+    rwlock->readers = 0;
+    Zem_init(&rwlock->lock, 1);
+    Zem_init(&rwlock->writelock, 1);
+}
+void RWLock_acquire_writelock(RWLockT* rwlock) { Zem_wait(&rwlock->writelock); }
+void RWLock_release_writelock(RWLockT* rwlock) { Zem_post(&rwlock->writelock); }
+void RWLock_acquire_readlock(RWLockT* rwlock)
+{
+    Zem_wait(&rwlock->lock);
+    if (++rwlock->readers == 1) // first reader acquires writelock
+        Zem_wait(&rwlock->writelock);
+    Zem_post(&rwlock->lock);
+}
+void RWLock_release_readlock(RWLockT* rwlock)
+{
+    Zem_wait(&rwlock->lock);
+    if (--rwlock->readers == 0) // last reader release writelock
+        Zem_post(&rwlock->writelock);
+    Zem_post(&rwlock->lock);
 }
